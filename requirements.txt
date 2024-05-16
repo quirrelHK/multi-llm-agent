@@ -1,0 +1,12 @@
+llama-index
+python-dotenv
+llama-index-experimental
+llama-index-llms-huggingface
+llama-index-llms-groq
+llama-index-llms-ollama
+uvicorn
+fastapi
+flask
+beautifulsoup4
+huggingface-hub
+llama-index-embeddings-huggingface
