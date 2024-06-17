@@ -13,6 +13,8 @@ from llama_index.llms.huggingface import HuggingFaceInferenceAPI
 from prompts import context, code_parser_template
 from huggingface_hub import login
 from code_reader import code_reader
+import ast
+
 
 load_dotenv()
 groq_api_key = os.getenv("GROQ_API_KEY")
@@ -23,7 +25,7 @@ login(huggingface_api_key)
 llm = Groq(model="mixtral-8x7b-32768", api_key=groq_api_key)
 
 llm2 = HuggingFaceInferenceAPI(
-    model_name="meta-llama/Meta-Llama-3-8B-Instruct",
+    model_name="HuggingFaceH4/zephyr-7b-alpha",
     token = huggingface_api_key
 )
 parser = LlamaParse(result_type="markdown")
@@ -60,11 +62,38 @@ class CodeOutput(BaseModel):
 parser = PydanticOutputParser(CodeOutput)
 json_prompt_str = parser.format(code_parser_template)
 json_prompt_tmpl = PromptTemplate(json_prompt_str)
-output_pipeline = QueryPipeline(chain=[json_prompt_tmpl, llm2])
+output_pipeline = QueryPipeline(chain=[json_prompt_tmpl, llm])
 
 
 while (prompt := input("Enter a prompt (q to quit): ")) != "q":
-    result = agent.query(prompt)
-    # print(result)
-    next_result = output_pipeline.run(response=result)
-    print(next_result)
+    
+    retries = 0
+    
+    while retries < 3:
+        try:
+            result = agent.query(prompt)
+            # print(result)
+            next_result = output_pipeline.run(response=result)
+            cleaned_json = ast.literal_eval(str(next_result).replace("assistant:",""))
+            break
+        except Exception as e:
+            retries += 1
+            print(f"Error occured, retry #{retries}:",e)
+    
+    if retries >= 3:
+        print("Unable to process request, try again...")
+        continue
+        
+    print("Code generated")
+    print(cleaned_json["code"])
+    
+    print("\n\nDescription",cleaned_json["description"])
+    
+    filename = cleaned_json["filename"]
+    
+    try:
+        with open(os.path.join("output",filename),"w") as f:
+            f.write(cleaned_json["code"])
+        print("File saved",filename)
+    except Exception as e:
+        print("Error saving",filename, e)
